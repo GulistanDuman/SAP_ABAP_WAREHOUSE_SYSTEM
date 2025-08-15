@@ -1,0 +1,233 @@
+FORM calculate_hourly_report.
+
+  DATA: lt_rapor TYPE STANDARD TABLE OF ty_rapor,
+        wa_rapor TYPE ty_rapor.
+  " # Yardımcı değişkenler
+  DATA: lv_sicil TYPE zgd_master_tbl-sicil_no.
+  " # 1. Materyal sayısı için yapı ve veri tabloları
+TYPES: BEGIN OF ty_mat_count,
+         material_name TYPE zgd_material_tbl-material_name,
+         cnt           TYPE i,
+       END OF ty_mat_count.
+
+  DATA: lt_mat_count TYPE TABLE OF ty_mat_count,
+        ls_mat_count TYPE ty_mat_count.
+
+  " # 2. Personel ve tarih bilgisi için yapı ve tablo
+  TYPES: BEGIN OF ty_sicil_date,
+           sicil_no     TYPE zgd_master_tbl-sicil_no,
+           entered_date TYPE sy-datum,
+         END OF ty_sicil_date.
+
+  DATA: lt_sicil_test TYPE TABLE OF ty_sicil_date,
+        ls_sicil_test TYPE ty_sicil_date.
+
+  " # 3. Sicil ve tarih bilgilerini topla
+  SELECT DISTINCT sicil_no, entered_date
+    FROM zgd_master_tbl
+    INTO TABLE @lt_sicil_test.
+
+  IF lt_sicil_test IS INITIAL.
+    MESSAGE 'Hiç personel ve tarih verisi bulunamadı (lt_sicil_test boş)' TYPE 'E'.
+    RETURN.
+  ENDIF.
+
+  " # 4. Her personel ve gün için materyal sayılarını topla
+  LOOP AT lt_sicil_test INTO ls_sicil_test.
+
+    lv_sicil = ls_sicil_test-sicil_no.
+
+    SELECT  material_name, COUNT(*) AS cnt
+      FROM zgd_master_tbl
+      WHERE entered_date = @ls_sicil_test-entered_date
+        AND sicil_no     = @lv_sicil
+      GROUP BY  material_name
+      INTO TABLE @lt_mat_count.
+
+    LOOP AT lt_mat_count INTO ls_mat_count.
+
+      CLEAR wa_rapor.
+      wa_rapor-sicil_no       = lv_sicil.
+      wa_rapor-tarih          = ls_sicil_test-entered_date.
+      wa_rapor-material_name  = ls_mat_count-material_name.
+      wa_rapor-kayit_sayisi   = ls_mat_count-cnt.
+
+      APPEND wa_rapor TO lt_rapor.
+    ENDLOOP.
+  ENDLOOP.
+
+  gt_rapor[] = lt_rapor[].
+
+  " # 6. Boş kontrolü
+  IF lt_rapor IS INITIAL.
+    MESSAGE 'lt_rapor boş, mail gönderilmeyecek!' TYPE 'E'.
+  ELSE.
+    WRITE: / 'Rapor satır sayısı:', lines( lt_rapor ).
+  ENDIF.
+ENDFORM.
+
+FORM send_hourly_report_mail.
+
+  DATA: wa_rapor TYPE ty_rapor,
+        it_mail_text TYPE TABLE OF solisti1,
+        wa_mail_text TYPE solisti1.
+
+  DATA: lv_sicil_no      TYPE c LENGTH 20,
+        lv_tarih         TYPE c LENGTH 20,
+        lv_kayit_sayisi  TYPE c LENGTH 20,
+        lv_material_name TYPE c LENGTH 100.
+
+  " ✅ Rapor tablosu boşsa mail oluşturmayı durdur
+  IF gt_rapor IS INITIAL.
+    MESSAGE 'gt_rapor boş, mail oluşturulamadı!' TYPE 'E'.
+    RETURN.
+  ELSE.
+    WRITE: / 'gt_rapor satır sayısı (mail için):', lines( gt_rapor ).
+  ENDIF.
+
+
+  wa_mail_text-line = '<html>'.
+  APPEND wa_mail_text TO it_mail_text.
+  wa_mail_text-line = '<head>'.
+  APPEND wa_mail_text TO it_mail_text.
+  wa_mail_text-line = '<meta charset="UTF-8">'.
+  APPEND wa_mail_text TO it_mail_text.
+
+  " # Mail için stil tanımı (HTML)
+  wa_mail_text-line = '<style>'.
+  APPEND wa_mail_text TO it_mail_text.
+  wa_mail_text-line = 'table { width: 100%; border-collapse: collapse; }'.
+  APPEND wa_mail_text TO it_mail_text.
+  wa_mail_text-line = 'th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }'.
+  APPEND wa_mail_text TO it_mail_text.
+  wa_mail_text-line = 'th { background-color: #f2f2f2; }'.
+  APPEND wa_mail_text TO it_mail_text.
+  wa_mail_text-line = '</style>'.
+  APPEND wa_mail_text TO it_mail_text.
+
+  wa_mail_text-line = '</head><body>'.
+  APPEND wa_mail_text TO it_mail_text.
+
+  " # Mail başlığı ve tablo başlık satırı
+  wa_mail_text-line = '<h3>Günlük Personel Veri Giriş Raporu</h3>'.
+  APPEND wa_mail_text TO it_mail_text.
+
+  wa_mail_text-line = '<table><tr><th>Personel ID</th><th>Tarih</th><th>Materyal Adı</th><th>Kayıt Sayısı</th></tr>'.
+  APPEND wa_mail_text TO it_mail_text.
+
+  " # Her rapor satırını HTML satırı olarak oluştur
+  LOOP AT gt_rapor INTO wa_rapor.
+
+    " ✏️ Loglama: Konsolda her satırı göster
+    WRITE: / 'Mail için işlenen kayıt:', wa_rapor-sicil_no, wa_rapor-material_name, wa_rapor-kayit_sayisi.
+
+    " # Alanları string'e çevir
+    WRITE: wa_rapor-sicil_no       TO lv_sicil_no.
+    WRITE: wa_rapor-tarih          TO lv_tarih.
+    WRITE: wa_rapor-kayit_sayisi   TO lv_kayit_sayisi.
+    WRITE: wa_rapor-material_name  TO lv_material_name.
+
+    " # HTML tablo satırı oluştur
+    CONCATENATE '<tr><td>' lv_sicil_no '</td><td>'
+                lv_tarih '</td><td>'
+                lv_material_name '</td><td>'
+                lv_kayit_sayisi '</td></tr>'
+                INTO wa_mail_text-line.
+
+    " ✉️ HTML satırını mail içeriğine ekle
+    APPEND wa_mail_text TO it_mail_text.
+
+  ENDLOOP.
+
+  " ✅ Mail içeriği yeterli satırda üretildi mi?
+  IF lines( it_mail_text ) <= 10.
+    MESSAGE 'Mail içeriği yeterli veri üretmedi! (HTML satırları çok az)' TYPE 'W'.
+  ELSE.
+    WRITE: / 'Mail içeriği satır sayısı:', lines( it_mail_text ).
+  ENDIF.
+
+  " # HTML kapanış tag'leri
+  wa_mail_text-line = '</table></body></html>'.
+  APPEND wa_mail_text TO it_mail_text.
+
+  " # Mail gönderimi başlatılıyor mesajı
+  WRITE: / 'Mail gönderimi başlatılıyor...'.
+
+  " # Mail gönderme fonksiyonunu çağır
+  PERFORM send_mail_bcs USING it_mail_text.
+
+  " # Mail fonksiyonu çağrıldı
+  WRITE: / 'Mail gönderme çağrısı tamamlandı.'.
+
+ENDFORM.
+
+FORM send_mail_bcs USING it_mail_text TYPE soli_tab.
+
+  DATA: lo_send_request TYPE REF TO cl_bcs,
+        lo_document     TYPE REF TO cl_document_bcs,
+        lo_sender       TYPE REF TO if_sender_bcs,
+        lo_recipient    TYPE REF TO if_recipient_bcs,
+        lv_result       TYPE os_boolean.
+
+  TRY.
+
+      WRITE: / '⏳ Mail objesi oluşturuluyor...'.
+      lo_send_request = cl_bcs=>create_persistent( ).
+      IF lo_send_request IS BOUND.
+        WRITE: / '✅ create_persistent başarılı.'.
+      ELSE.
+        MESSAGE '❌ create_persistent başarısız.' TYPE 'E'.
+      ENDIF.
+
+      WRITE: / '# HTML document oluşturuluyor...'.
+      lo_document = cl_document_bcs=>create_document(
+                      i_type    = 'HTM'
+                      i_subject = 'Günlük Saatlik Veri Giriş Raporu'
+                      i_text    = it_mail_text ).
+      IF lo_document IS BOUND.
+        WRITE: / '✅ create_document başarılı.'.
+      ELSE.
+        MESSAGE '❌ create_document başarısız.' TYPE 'E'.
+      ENDIF.
+
+      WRITE: / '# Doküman mail objesine bağlanıyor...'.
+      lo_send_request->set_document( lo_document ).
+      WRITE: / '✅ set_document tamamlandı.'.
+
+      WRITE: / '# Gönderen e-posta adresi tanımlanıyor...'.
+      lo_sender = cl_cam_address_bcs=>create_internet_address( 'sap@bmc.com.tr' ).
+      lo_send_request->set_sender( lo_sender ).
+      WRITE: / '✅ set_sender tamamlandı.'.
+
+      WRITE: / '# Alıcı e-posta adresi ekleniyor...'.
+      lo_recipient = cl_cam_address_bcs=>create_internet_address( 'glstndmn_00@outlook.com' ).
+      lo_send_request->add_recipient(
+        i_recipient = lo_recipient
+        i_express   = abap_true ).
+      WRITE: / '✅ add_recipient tamamlandı.'.
+
+      WRITE: / '# Mail gönderimi başlatılıyor...'.
+      lv_result = lo_send_request->send( i_with_error_screen = abap_true ).
+
+      IF lv_result = abap_true.
+        WRITE: / '✅ send( ) başarılı (lv_result = TRUE)'.
+      ELSE.
+        MESSAGE '❌ send( ) başarısız oldu. (lv_result = FALSE)' TYPE 'E'.
+      ENDIF.
+
+      WRITE: / '# COMMIT WORK çağrılıyor...'.
+      COMMIT WORK AND WAIT.
+      WRITE: / '✅ COMMIT tamamlandı.'.
+
+      IF lv_result = abap_true.
+        MESSAGE '# E-posta başarıyla gönderildi.' TYPE 'S'.
+      ELSE.
+        MESSAGE '# E-posta gönderimi başarısız oldu.' TYPE 'E'.
+      ENDIF.
+
+    CATCH cx_bcs INTO DATA(lx_bcs).
+      WRITE: / '❌ İstisna oluştu:', lx_bcs->get_text( ).
+      MESSAGE lx_bcs->get_text( ) TYPE 'E'.
+  ENDTRY.
+
+ENDFORM.

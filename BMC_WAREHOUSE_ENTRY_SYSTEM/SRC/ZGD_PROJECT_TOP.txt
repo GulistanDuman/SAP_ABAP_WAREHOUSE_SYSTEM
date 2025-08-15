@@ -1,0 +1,53 @@
+*&---------------------------------------------------------------------*
+*&  Include           ZGD_PROJECT_TOP
+*&---------------------------------------------------------------------*
+TYPES: BEGIN OF ty_rapor,
+         sicil_no      TYPE zgd_master_tbl-sicil_no,
+         tarih         TYPE zgd_master_tbl-entered_date,
+         saat_aralik   TYPE char11,
+         material_id   TYPE zgd_master_tbl-material_id,
+         kayit_sayisi  TYPE i,
+         material_name TYPE zgd_master_tbl-material_name,
+       END OF ty_rapor.
+DATA:  gs_rapor TYPE ty_rapor.
+DATA: lv_start_time TYPE tims,
+      lv_end_time   TYPE tims,
+      lv_index      TYPE i.
+
+DATA: gt_rapor TYPE STANDARD TABLE OF ty_rapor WITH EMPTY KEY,
+      wa_rapor TYPE ty_rapor.
+DATA: lt_rapor TYPE STANDARD TABLE OF ty_rapor.
+
+TABLES: zgd_personel_tbl, ZGD_MASTER_TBL.
+
+DATA: p_sicil   TYPE zgd_personel_tbl-sicil_no,
+      p_name    TYPE zgd_personel_tbl-personel_name,
+      p_surnam  TYPE zgd_personel_tbl-personel_surname.
+
+DATA: wa_personel TYPE zgd_personel_tbl.
+DATA: wa_master TYPE zgd_master_tbl.
+DATA: lt_personel TYPE TABLE OF zgd_personel_tbl.
+
+DATA: gv_sicil   TYPE zgd_personel_tbl-sicil_no,
+      gv_name    TYPE zgd_personel_tbl-personel_name,
+      gv_surname TYPE zgd_personel_tbl-personel_surname.
+
+DATA: p_matid   TYPE zgd_material_tbl-material_id,
+      p_depoid  TYPE zgd_depo_table-warehouse_id.
+
+DATA: p_matname     TYPE zgd_material_tbl-material_name,
+      p_mattype     TYPE ZGD_MATERIAL_TBL-material_type,
+      p_matdepoid   TYPE ZGD_MATERIAL_TBL-WAREHOUSE_ID,
+      p_savunma     TYPE ZGD_MATERIAL_TBL-SAVUNMA_SANAYI.
+
+DATA: p_deponame TYPE ZGD_DEPO_TABLE-warehouse_name.
+
+DATA: p_qty TYPE zgd_master_tbl-quantity.
+
+DATA: lt_matid TYPE TABLE OF zgd_material_tbl,
+      lt_depoid TYPE TABLE OF zgd_depo_table.
+
+DATA: wa_matid TYPE zgd_material_tbl,
+      wa_depoid TYPE zgd_depo_table.
+
+DATA: gv_is_admin TYPE abap_bool VALUE abap_false.

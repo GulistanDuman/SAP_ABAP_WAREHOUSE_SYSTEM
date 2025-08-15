@@ -1,0 +1,551 @@
+*&---------------------------------------------------------------------*
+*&  Include           ZGD_PROJECT_FORM
+*&---------------------------------------------------------------------*
+FORM ekle_material.
+
+  DATA: wa_material TYPE zgd_material_tbl,
+        lv_maxid    TYPE zgd_material_tbl-material_id.
+
+  IF p_matname IS INITIAL OR p_mattype IS INITIAL OR p_matdepoid IS INITIAL.
+    MESSAGE 'Materyal adı, tipi ve depo ID boş olamaz!' TYPE 'E'.
+    RETURN.
+  ENDIF.
+
+  SELECT MAX( material_id ) INTO lv_maxid FROM zgd_material_tbl.
+  IF sy-subrc <> 0 OR lv_maxid IS INITIAL.
+    lv_maxid = 999.  " ilk kayıt için başlangıç ID
+  ENDIF.
+  wa_material-material_id = lv_maxid + 1.
+
+  wa_material-material_name  = p_matname.
+  wa_material-material_type  = p_mattype.
+  wa_material-warehouse_id   = p_matdepoid.
+  wa_material-savunma_sanayi = p_savunma.  " eğer bu alan varsa
+
+  INSERT zgd_material_tbl FROM wa_material.
+
+  IF sy-subrc = 0.
+    MESSAGE 'Materyal başarıyla eklendi.' TYPE 'S'.
+    CLEAR: p_matname, p_mattype, p_matdepoid, p_savunma.
+  ELSE.
+    MESSAGE 'Materyal eklenemedi!' TYPE 'E'.
+  ENDIF.
+ENDFORM.
+
+FORM ekle_depo.
+
+  DATA: wa_depo TYPE zgd_depo_table.
+
+  IF p_depoid IS INITIAL OR p_deponame IS INITIAL.
+    MESSAGE 'Depo ID ve adı boş bırakılamaz!' TYPE 'E'.
+    RETURN.
+  ENDIF.
+
+  SELECT SINGLE * INTO wa_depo FROM zgd_depo_table
+    WHERE warehouse_id = p_depoid.
+
+  IF sy-subrc = 0.
+    MESSAGE 'Bu ID ile zaten bir depo var!' TYPE 'E'.
+    RETURN.
+  ENDIF.
+
+  wa_depo-warehouse_id   = p_depoid.
+  wa_depo-warehouse_name = p_deponame.
+
+  INSERT zgd_depo_table FROM wa_depo.
+
+  IF sy-subrc = 0.
+    MESSAGE 'Depo başarıyla eklendi.' TYPE 'S'.
+    CLEAR: p_depoid, p_deponame.
+  ELSE.
+    MESSAGE 'Depo eklenemedi!' TYPE 'E'.
+  ENDIF.
+ENDFORM.
+
+FORM ekle_personel .
+ DATA: wa_personel TYPE zgd_personel_tbl.
+
+  " 1. Alanların boş olmamasını kontrol et
+  IF p_sicil IS INITIAL OR p_name IS INITIAL OR p_surnam IS INITIAL.
+    MESSAGE 'Tüm personel alanları doldurulmalıdır!' TYPE 'E'.
+    RETURN.
+  ENDIF.
+
+  SELECT SINGLE * INTO wa_personel
+    FROM zgd_personel_tbl
+    WHERE sicil_no = p_sicil.
+
+  IF sy-subrc = 0.
+    MESSAGE 'Bu sicil numarası zaten kayıtlı!' TYPE 'E'.
+    RETURN.
+  ENDIF.
+
+  wa_personel-sicil_no        = p_sicil.
+  wa_personel-personel_name   = p_name.
+  wa_personel-personel_surname = p_surnam.
+
+  INSERT zgd_personel_tbl FROM wa_personel.
+
+  IF sy-subrc = 0.
+    MESSAGE 'Personel başarıyla eklendi.' TYPE 'S'.
+    CLEAR: p_sicil, p_name, p_surnam.
+  ELSE.
+    MESSAGE 'Personel eklenemedi!' TYPE 'E'.
+  ENDIF.
+ENDFORM.
+
+FORM show_personel.
+  DATA: lt_personel TYPE STANDARD TABLE OF zgd_personel_tbl,
+        lo_alv      TYPE REF TO cl_salv_table.
+
+  SELECT * FROM zgd_personel_tbl INTO TABLE lt_personel.
+
+  IF sy-subrc = 0.
+    TRY.
+
+        cl_salv_table=>factory(
+          IMPORTING r_salv_table = lo_alv
+          CHANGING  t_table      = lt_personel
+        ).
+
+
+        lo_alv->display( ).
+
+      CATCH cx_salv_msg INTO DATA(lx_msg).
+        MESSAGE lx_msg->get_text( ) TYPE 'E'.
+    ENDTRY.
+  ELSE.
+    MESSAGE 'Personel tablosu boş!' TYPE 'I'.
+  ENDIF.
+ENDFORM.
+
+*----------------------------------------------------------------------*
+***INCLUDE ZGD_PROJECT_FILL_DEPO_LISTBF01.
+*----------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*&      Form  FILL_DEPO_LISTBOX_MATERIAL
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM fill_material_listbox.
+
+  DATA: lt_values  TYPE vrm_values,
+        ls_value   TYPE vrm_value,
+        lt_mat     TYPE TABLE OF zgd_material_tbl,
+        wa_mat     TYPE zgd_material_tbl.
+
+  SELECT * FROM zgd_material_tbl INTO TABLE lt_mat.
+
+  LOOP AT lt_mat INTO wa_mat.
+    ls_value-key  = wa_mat-material_name.
+    ls_value-text = wa_mat-material_name.
+    APPEND ls_value TO lt_values.
+  ENDLOOP.
+
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = 'P_MATNAME'
+      values = lt_values.
+
+ENDFORM.
+
+FORM fill_materialname_listbox.
+
+  DATA: lt_values TYPE vrm_values,
+        ls_value  TYPE vrm_value,
+        lt_mat    TYPE TABLE OF zgd_material_tbl,
+        wa_mat    TYPE zgd_material_tbl.
+
+  SELECT * FROM zgd_material_tbl INTO TABLE lt_mat.
+
+  LOOP AT lt_mat INTO wa_mat.
+    ls_value-key  = wa_mat-material_name.
+    ls_value-text = wa_mat-material_name.
+    APPEND ls_value TO lt_values.
+  ENDLOOP.
+
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = 'P_MATNAME'
+      values = lt_values.
+
+ENDFORM.
+
+FORM fill_quantity_listbox.
+
+  DATA: lt_values TYPE vrm_values,
+        ls_value  TYPE vrm_value,
+        lv_count  TYPE i.
+
+  CLEAR lt_values.
+
+  DO 10 TIMES.
+    lv_count = sy-index.
+    ls_value-key  = lv_count.
+    ls_value-text = |{ lv_count } adet|.
+    APPEND ls_value TO lt_values.
+  ENDDO.
+
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = 'P_QTY'  " <-- alan adın
+      values = lt_values.
+
+ENDFORM.
+
+MODULE fill_depoid_listbox OUTPUT.
+  PERFORM fill_depoid_listbox.
+ENDMODULE.
+
+MODULE depoid_f4 INPUT.
+  DATA: lt_return_dep TYPE TABLE OF ddshretval,
+        lt_depo   TYPE TABLE OF zgd_depo_table.
+
+  SELECT * FROM zgd_depo_table INTO TABLE lt_depo.
+
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+      retfield        = 'WAREHOUSE_ID'
+      dynpprog        = sy-repid
+      dynpnr          = sy-dynnr
+      dynprofield     = 'P_DEPOID'
+      value_org       = 'S'
+    TABLES
+      value_tab       = lt_depo
+      return_tab      = lt_return_dep
+    EXCEPTIONS
+      others          = 1.
+ENDMODULE.
+
+MODULE matname_f4 INPUT.
+  DATA: lt_return_mat TYPE TABLE OF ddshretval,
+        lt_material   TYPE TABLE OF zgd_material_tbl.
+
+  SELECT * FROM zgd_material_tbl INTO TABLE lt_material.
+
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+      retfield        = 'MATERIAL_NAME'
+      dynpprog        = sy-repid
+      dynpnr          = sy-dynnr
+      dynprofield     = 'P_MATNAME'
+      value_org       = 'S'
+    TABLES
+      value_tab       = lt_material
+      return_tab      = lt_return_mat
+    EXCEPTIONS
+      others          = 1.
+ENDMODULE.
+
+FORM fill_matdepoid_listbox.
+  DATA: lt_values TYPE vrm_values,
+        ls_value  TYPE vrm_value,
+        lt_depo   TYPE TABLE OF zgd_depo_table,
+        wa_depo   TYPE zgd_depo_table.
+
+  SELECT * FROM zgd_depo_table INTO TABLE lt_depo.
+
+  LOOP AT lt_depo INTO wa_depo.
+    ls_value-key  = wa_depo-warehouse_id.
+    ls_value-text = wa_depo-warehouse_id.
+    APPEND ls_value TO lt_values.
+  ENDLOOP.
+
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = 'P_MATDEPOID'
+      values = lt_values.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Module  FILL_MATDEPOID_LISTBOX  OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE fill_matdepoid_listbox OUTPUT.
+  PERFORM fill_matdepoid_listbox.
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  FILL_SILME_LISTBOXES  OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE fill_silme_listboxes OUTPUT.
+  PERFORM fill_silme_listboxes.
+ENDMODULE.
+
+FORM fill_silme_listboxes.
+
+  DATA: lt_val TYPE vrm_values,
+        ls_val TYPE vrm_value,
+        lt_mat TYPE TABLE OF zgd_material_tbl,
+        wa_mat TYPE zgd_material_tbl.
+
+  SELECT * FROM zgd_material_tbl INTO TABLE lt_mat.
+  LOOP AT lt_mat INTO wa_mat.
+    ls_val-key = wa_mat-material_id.
+    ls_val-text = wa_mat-material_id.
+    APPEND ls_val TO lt_val.
+  ENDLOOP.
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = 'P_MATID'
+      values = lt_val.
+
+  CLEAR: lt_val[].
+ENDFORM.
+
+FORM sil_material.
+
+  DATA: lv_matid   TYPE zgd_material_tbl-material_id,
+        lv_matname TYPE zgd_material_tbl-material_name.
+
+  lv_matid   = p_matid.
+  lv_matname = p_matname.
+
+  DELETE FROM zgd_material_tbl
+    WHERE material_id   = lv_matid
+      AND material_name = lv_matname.
+
+  IF sy-subrc = 0.
+    MESSAGE 'Materyal başarıyla silindi.' TYPE 'S'.
+  ELSE.
+    MESSAGE 'Materyal silinemedi veya bulunamadı!' TYPE 'E'.
+  ENDIF.
+
+ENDFORM.
+
+FORM sil_personel.
+
+  DATA: lv_sicil   TYPE zgd_personel_tbl-sicil_no,
+        lv_pname   TYPE zgd_personel_tbl-personel_name.
+
+  lv_sicil = p_sicil.
+  lv_pname = p_name.
+
+  DELETE FROM zgd_personel_tbl
+    WHERE sicil_no     = lv_sicil
+      AND personel_name = lv_pname.
+
+  IF sy-subrc = 0.
+    MESSAGE 'Personel başarıyla silindi.' TYPE 'S'.
+  ELSE.
+    MESSAGE 'Personel silinemedi veya bulunamadı!' TYPE 'E'.
+  ENDIF.
+
+ENDFORM.
+
+FORM fill_personelid_sil_listbox.
+
+  DATA: lt_val TYPE vrm_values,
+        ls_val TYPE vrm_value,
+        lt_per TYPE TABLE OF zgd_personel_tbl,
+        wa_per TYPE zgd_personel_tbl.
+
+  SELECT * FROM zgd_personel_tbl INTO TABLE lt_per.
+
+  LOOP AT lt_per INTO wa_per.
+    ls_val-key  = wa_per-sicil_no.
+    ls_val-text = wa_per-sicil_no.
+    APPEND ls_val TO lt_val.
+  ENDLOOP.
+
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = 'P_SICIL'
+      values = lt_val.
+
+ENDFORM.
+
+FORM fill_personelname_sil_listbox.
+
+  DATA: lt_val TYPE vrm_values,
+        ls_val TYPE vrm_value,
+        lt_per TYPE TABLE OF zgd_personel_tbl,
+        wa_per TYPE zgd_personel_tbl.
+
+  SELECT * FROM zgd_personel_tbl INTO TABLE lt_per.
+
+  LOOP AT lt_per INTO wa_per.
+    ls_val-key  = wa_per-personel_name.
+    ls_val-text = wa_per-personel_name.
+    APPEND ls_val TO lt_val.
+  ENDLOOP.
+
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = 'P_NAME'
+      values = lt_val.
+
+ENDFORM.
+FORM fill_depoid_listbox.
+
+  DATA: lt_val TYPE vrm_values,
+        ls_val TYPE vrm_value,
+        lt_depo TYPE TABLE OF zgd_depo_table,
+        wa_depo TYPE zgd_depo_table.
+
+  SELECT * FROM zgd_depo_table INTO TABLE lt_depo.
+
+  LOOP AT lt_depo INTO wa_depo.
+    ls_val-key  = wa_depo-warehouse_id.
+    ls_val-text = wa_depo-warehouse_id.
+    APPEND ls_val TO lt_val.
+  ENDLOOP.
+
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = 'P_DEPOID'
+      values = lt_val.
+
+ENDFORM.
+
+
+
+FORM fill_deponame_listbox.
+  DATA: lt_val TYPE vrm_values,
+        ls_val TYPE vrm_value,
+        lt_depo TYPE TABLE OF zgd_depo_table,
+        wa_depo TYPE zgd_depo_table.
+
+  SELECT * FROM zgd_depo_table INTO TABLE lt_depo.
+
+  LOOP AT lt_depo INTO wa_depo.
+    ls_val-key  = wa_depo-warehouse_name. " sadece isim!
+    ls_val-text = wa_depo-warehouse_name.
+    APPEND ls_val TO lt_val.
+  ENDLOOP.
+
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = 'P_DEPONAME' " <-- ekran alanının adı
+      values = lt_val.
+ENDFORM.
+
+MODULE fill_deponame_listbox OUTPUT.
+  PERFORM fill_deponame_listbox.
+ENDMODULE.
+
+FORM sil_depo.
+  DATA: lv_depoid   TYPE zgd_depo_table-warehouse_id,
+        lv_deponame TYPE zgd_depo_table-warehouse_name.
+
+  lv_depoid   = p_depoid.
+  lv_deponame = p_deponame.
+
+  DELETE FROM zgd_depo_table
+    WHERE warehouse_id   = lv_depoid
+      AND warehouse_name = lv_deponame.
+
+  IF sy-subrc = 0.
+    MESSAGE 'Depo başarıyla silindi.' TYPE 'S'.
+  ELSE.
+    MESSAGE 'Depo silinemedi veya bulunamadı!' TYPE 'E'.
+  ENDIF.
+ENDFORM.
+
+FORM ekle_kayit.
+  DATA: wa_master     TYPE zgd_master_tbl,
+        lv_mat_type   TYPE zgd_material_tbl-material_type,
+        lv_savunma    TYPE zgd_material_tbl-savunma_sanayi,
+        lv_maxid      TYPE zgd_master_tbl-material_id,
+        lv_newid      TYPE zgd_master_tbl-material_id.
+  SELECT SINGLE material_type INTO lv_mat_type
+    FROM zgd_material_tbl
+    WHERE material_name = p_matname.
+  IF sy-subrc <> 0.
+    MESSAGE 'Seçilen materyal adına ait tür bulunamadı!' TYPE 'I'.
+    EXIT.
+  ENDIF.
+  SELECT SINGLE savunma_sanayi INTO lv_savunma
+    FROM zgd_material_tbl
+    WHERE material_name = p_matname.
+  CASE p_depoid.
+    WHEN '1'.
+      IF lv_mat_type <> 'ZIRHLI_ARAC' AND lv_mat_type <> 'VURAN'.
+        MESSAGE 'Bu depo sadece zırhlı araç malzemesi alır!' TYPE 'I'.
+        EXIT.
+      ENDIF.
+    WHEN '2'.
+      IF lv_mat_type <> 'KIRPI' AND lv_mat_type <> 'AMAZON'.
+        MESSAGE 'Bu depo sadece elektronik malzeme alır!' TYPE 'I'.
+        EXIT.
+      ENDIF.
+    WHEN '3'.
+      IF lv_mat_type <> 'KAMYON' AND lv_mat_type <> 'TIR'.
+        MESSAGE 'Bu depo sadece kamyon ve tır alır!' TYPE 'I'.
+        EXIT.
+      ENDIF.
+    WHEN '4'.
+      IF lv_mat_type <> 'OTOBUS'.
+        MESSAGE 'Bu depo sadece otobüs alır!' TYPE 'I'.
+        EXIT.
+      ENDIF.
+    WHEN '5'.
+      IF lv_mat_type <> 'SENSOR' AND lv_mat_type <> 'KAMERA'.
+        MESSAGE 'Bu depo sadece sensör ve kamera malzemesi alır!' TYPE 'I'.
+        EXIT.
+      ENDIF.
+    WHEN '6'.
+      IF lv_mat_type <> 'PCB' AND lv_mat_type <> 'KABLO'.
+        MESSAGE 'Bu depo sadece hafif elektronik (PCB, Kablo) alır!' TYPE 'I'.
+        EXIT.
+      ENDIF.
+    WHEN '7'.
+      IF lv_mat_type <> 'TANK'.
+        MESSAGE 'Bu depo sadece tank alır!' TYPE 'I'.
+        EXIT.
+      ENDIF.
+      WHEN '8' OR '9' OR '10'.
+  ENDCASE.
+  SELECT MAX( material_id ) INTO lv_maxid FROM zgd_master_tbl.
+  IF sy-subrc <> 0 OR lv_maxid IS INITIAL.
+    lv_maxid = 999.
+  ENDIF.
+
+  DO p_qty TIMES.
+    lv_maxid = lv_maxid + 1.
+    lv_newid = lv_maxid.
+
+    CLEAR wa_master.
+    wa_master-material_id     = lv_newid.
+    wa_master-sicil_no        = gv_sicil.
+    wa_master-warehouse_id    = p_depoid.
+    wa_master-quantity        = 1.
+    wa_master-entered_date    = sy-datum.
+    wa_master-saat_bilgisi    = sy-uzeit.
+    wa_master-material_name   = p_matname.
+    wa_master-savunma_sanayi  = p_savunma.
+    INSERT zgd_master_tbl FROM wa_master.
+  ENDDO.
+  IF sy-subrc = 0.
+    MESSAGE |{ p_qty } adet kayıt başarıyla eklendi.| TYPE 'S'.
+  ELSE.
+    MESSAGE 'Kayıt eklenemedi!' TYPE 'I'.
+  ENDIF.
+ENDFORM.
+
+FORM hide_admin_buttons_0200.
+
+  LOOP AT SCREEN.
+    IF screen-name = 'BTN_EKLE1' OR
+       screen-name = 'BTN_EKLE2' OR
+       screen-name = 'BTN_EKLE5' OR
+       screen-name = 'BTN_EKLE3' OR
+       screen-name = 'BTN_*'.
+
+      IF gv_is_admin = abap_true.
+        screen-active = 1.
+        screen-invisible = 0.
+      ELSE.
+        screen-active = 0.
+        screen-invisible = 1.
+      ENDIF.
+
+      MODIFY SCREEN.
+    ENDIF.
+  ENDLOOP.
+
+ENDFORM.

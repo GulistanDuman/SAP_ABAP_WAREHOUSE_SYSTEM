@@ -1,0 +1,184 @@
+
+*&---------------------------------------------------------------------*
+*&  Include           ZGD_PROJECT_SHOW
+*&---------------------------------------------------------------------*
+FORM show_master.
+  DATA: lt_master TYPE STANDARD TABLE OF zgd_master_tbl,
+        lo_alv    TYPE REF TO cl_salv_table,
+        lo_cols   TYPE REF TO cl_salv_columns_table,
+        lo_col    TYPE REF TO cl_salv_column.
+
+  SELECT * FROM zgd_master_tbl
+    INTO TABLE lt_master
+    ORDER BY material_id DESCENDING.
+
+  IF sy-subrc = 0.
+    TRY.
+        cl_salv_table=>factory(
+          IMPORTING
+            r_salv_table = lo_alv
+          CHANGING
+            t_table      = lt_master
+        ).
+        lo_alv->get_sorts( )->clear( ).
+        lo_cols = lo_alv->get_columns( ).
+        TRY.
+          lo_col = lo_cols->get_column( 'MATERIAL_ID' ).
+          lo_col->set_short_text(  'Mat ID' ).
+          lo_col->set_medium_text( 'Material ID' ).
+          lo_col->set_long_text(   'Material Identification Number' ).
+
+          lo_col = lo_cols->get_column( 'WAREHOUSE_ID' ).
+          lo_col->set_short_text(  'Depo ID' ).
+          lo_col->set_medium_text( 'Warehouse ID' ).
+          lo_col->set_long_text(   'Warehouse Identification Number' ).
+
+          lo_col = lo_cols->get_column( 'SICIL_NO' ).
+          lo_col->set_short_text(  'Sicil' ).
+          lo_col->set_medium_text( 'Personel Sicil No' ).
+          lo_col->set_long_text(   'Employee Registry Number' ).
+
+          lo_col = lo_cols->get_column( 'ENTERED_DATE' ).
+          lo_col->set_short_text(  'Tarih' ).
+          lo_col->set_medium_text( 'Giriş Tarihi' ).
+          lo_col->set_long_text(   'Date of Entry' ).
+
+          lo_col = lo_cols->get_column( 'SAAT_BILGISI' ).
+          lo_col->set_short_text(  'Saat' ).
+          lo_col->set_medium_text( 'Giriş Saati' ).
+          lo_col->set_long_text(   'Entry Time' ).
+
+          lo_col = lo_cols->get_column( 'QUANTITY' ).
+          lo_col->set_short_text(  'Adet' ).
+          lo_col->set_medium_text( 'Miktar' ).
+          lo_col->set_long_text(   'Quantity of Items' ).
+
+          lo_col = lo_cols->get_column( 'SAVUNMA_SANAYI' ).
+          lo_col->set_short_text(  'Savunma' ).
+          lo_col->set_medium_text( 'Savunma Sanayi' ).
+          lo_col->set_long_text(   'Savunma Sanayi Alanı' ).
+
+          lo_col = lo_cols->get_column( 'MATERIAL_NAME' ).
+          lo_col->set_short_text(  'İsim' ).
+          lo_col->set_medium_text( 'Materyal İsmi' ).
+          lo_col->set_long_text(   'Material Name' ).
+
+        CATCH cx_salv_not_found.
+          " Eğer alan yoksa hatayı yut
+        ENDTRY.
+        " ALV'yi göster
+        lo_alv->display( ).
+      CATCH cx_salv_msg INTO DATA(lx_msg).
+        MESSAGE lx_msg->get_text( ) TYPE 'E'.
+    ENDTRY.
+  ELSE.
+    MESSAGE 'Master tablosu boş!' TYPE 'I'.
+  ENDIF.
+ENDFORM.
+
+FORM show_material.
+  DATA: lt_material TYPE STANDARD TABLE OF zgd_material_tbl,
+        lo_alv      TYPE REF TO cl_salv_table,
+        lo_cols     TYPE REF TO cl_salv_columns_table,
+        lo_col      TYPE REF TO cl_salv_column.
+
+  SELECT * FROM zgd_material_tbl INTO TABLE lt_material.
+
+  IF sy-subrc = 0.
+    TRY.
+        cl_salv_table=>factory(
+          IMPORTING
+            r_salv_table = lo_alv
+          CHANGING
+            t_table      = lt_material
+        ).
+
+        " Sütun başlıklarını düzenle
+        lo_cols = lo_alv->get_columns( ).
+
+        TRY.
+            lo_col = lo_cols->get_column( 'MATERIAL_ID' ).
+            lo_col->set_short_text(  'Mat ID' ).
+            lo_col->set_medium_text( 'Material ID' ).
+            lo_col->set_long_text(   'Material Identification Number' ).
+
+            lo_col = lo_cols->get_column( 'MATERIAL_NAME' ).
+            lo_col->set_short_text(  'İsim' ).
+            lo_col->set_medium_text( 'Material Name' ).
+            lo_col->set_long_text(   'Material Name' ).
+
+            lo_col = lo_cols->get_column( 'MATERIAL_TYPE' ).
+            lo_col->set_short_text(  'Tür' ).
+            lo_col->set_medium_text( 'Material Type' ).
+            lo_col->set_long_text(   'Material Type' ).
+
+            lo_col = lo_cols->get_column( 'WAREHOUSE_ID' ).
+            lo_col->set_short_text(  'Depo' ).
+            lo_col->set_medium_text( 'Warehouse ID' ).
+            lo_col->set_long_text(   'Warehouse ID' ).
+
+            lo_col = lo_cols->get_column( 'SAVUNMA_SANAYI' ).
+            lo_col->set_short_text(  'Savunma' ).
+            lo_col->set_medium_text( 'Savunma Alanı' ).
+            lo_col->set_long_text(   'Savunma Sanayi Alanı' ).
+
+          CATCH cx_salv_not_found.
+            " Kolon bulunamadıysa hata bastırma
+        ENDTRY.
+
+        lo_alv->display( ).
+
+      CATCH cx_salv_msg INTO DATA(lx_msg).
+        MESSAGE lx_msg->get_text( ) TYPE 'E'.
+    ENDTRY.
+
+  ELSE.
+    MESSAGE 'Material tablosu boş!' TYPE 'I'.
+  ENDIF.
+ENDFORM.
+
+FORM show_warehouse.
+
+  DATA: lt_depo TYPE STANDARD TABLE OF zgd_depo_table,
+        lo_alv  TYPE REF TO cl_salv_table,
+        lo_cols TYPE REF TO cl_salv_columns_table,
+        lo_col  TYPE REF TO cl_salv_column.
+
+  SELECT * FROM zgd_depo_table INTO TABLE lt_depo.
+
+  IF sy-subrc = 0.
+    TRY.
+        cl_salv_table=>factory(
+          IMPORTING
+            r_salv_table = lo_alv
+          CHANGING
+            t_table      = lt_depo
+        ).
+
+        " Sütun başlıklarını düzenle
+        lo_cols = lo_alv->get_columns( ).
+
+        TRY.
+            lo_col = lo_cols->get_column( 'WAREHOUSE_ID' ).
+            lo_col->set_short_text(  'ID' ).
+            lo_col->set_medium_text( 'Warh. ID' ).
+            lo_col->set_long_text(   'Warehouse ID' ).
+
+            lo_col = lo_cols->get_column( 'WAREHOUSE_NAME' ).
+            lo_col->set_short_text(  'Ad' ).
+            lo_col->set_medium_text( 'W. NAME' ).
+            lo_col->set_long_text(   'Warehouse Name' ).
+
+          CATCH cx_salv_not_found.
+            " Kolon bulunamadıysa sessiz geç
+        ENDTRY.
+
+        lo_alv->display( ).
+
+      CATCH cx_salv_msg INTO DATA(lx_msg).
+        MESSAGE lx_msg->get_text( ) TYPE 'E'.
+    ENDTRY.
+  ELSE.
+    MESSAGE 'Depo tablosu boş!' TYPE 'I'.
+  ENDIF.
+ENDFORM.

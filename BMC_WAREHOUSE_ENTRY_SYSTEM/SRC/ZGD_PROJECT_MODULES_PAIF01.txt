@@ -1,0 +1,119 @@
+*&---------------------------------------------------------------------*
+*&  Include           ZGD_PROJECT_MODULES_PAIF01
+*&---------------------------------------------------------------------*
+MODULE user_command_0100 INPUT.
+  CASE sy-ucomm.
+    WHEN '&BACK'.
+      LEAVE TO SCREEN 0.
+    WHEN '&CANCEL'.
+      LEAVE TO SCREEN 0.
+    WHEN '&EXIT'.
+      LEAVE TO SCREEN 0.
+    WHEN '&PRSNL'.
+
+      gv_is_admin = abap_false.
+
+      IF gv_sicil = '0001' AND gv_name = 'OSMAN' AND gv_surname = 'BEY'.
+        MESSAGE 'Yönetici bilgileriyle personel girişi yapılamaz!' TYPE 'I'.
+        RETURN.
+      ENDIF.
+
+      SELECT SINGLE * INTO wa_personel
+        FROM zgd_personel_tbl
+        WHERE sicil_no = gv_sicil
+          AND personel_name = gv_name
+          AND personel_surname = gv_surname.
+
+      IF sy-subrc = 0.
+        MESSAGE 'Personel girişi başarılı!' TYPE 'S'.
+        CALL SCREEN '0200'.
+      ELSE.
+        MESSAGE 'Personel bilgileri hatalı!' TYPE 'I'.
+      ENDIF.
+
+    WHEN '&YNTC'.
+
+      IF gv_sicil = '0001' AND gv_name = 'OSMAN' AND gv_surname = 'BEY'.
+        gv_is_admin = abap_true.
+        MESSAGE 'Yönetici girişi başarılı!' TYPE 'S'.
+        CALL SCREEN '0200'.
+      ELSE.
+        gv_is_admin = abap_false.
+        MESSAGE 'Geçersiz yönetici bilgileri!' TYPE 'I'.
+      ENDIF.
+  ENDCASE.
+ENDMODULE.
+
+MODULE user_command_0200 INPUT.
+   CASE sy-ucomm.
+    WHEN '&BACK' OR '&CANCEL' OR '&EXIT'.
+      LEAVE TO SCREEN 0.
+    WHEN '&EKKYT'.
+       PERFORM ekle_kayit.
+    WHEN '&MSTR'.
+      PERFORM show_master.
+
+    WHEN '&MTRL'.
+      PERFORM show_material.
+
+    WHEN '&DEPO'.
+      PERFORM show_warehouse.
+    WHEN '&BTN_EKLE'.
+      CALL SCREEN '0300'.
+    WHEN '&BTN_SIL'.
+      CALL SCREEN '0400'.
+    WHEN '&PRSNLG'.
+      PERFORM show_personel.
+  ENDCASE.
+ENDMODULE.
+
+MODULE user_command_0300 INPUT.
+     CASE sy-ucomm.
+
+    WHEN '&EG'.
+      PERFORM ekle_material.
+
+    WHEN '&PRSNLKL'.
+       PERFORM ekle_personel.
+
+    WHEN '&EKLE'.
+       PERFORM ekle_depo.
+
+    WHEN '&TRNBCK'.
+      CALL SCREEN '0200'.
+    WHEN '&BACK'.
+      LEAVE TO SCREEN 0.
+    WHEN '&CANCEL'.
+      LEAVE TO SCREEN 0.
+    WHEN '&EXIT'.
+      LEAVE TO SCREEN 0.
+  ENDCASE.
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  STATUS_0400  OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE user_command_0400 INPUT.
+CASE SY-UCOMM.
+  WHEN '&BACK'.
+    LEAVE TO SCREEN 0.
+  WHEN '&EXIT'.
+    LEAVE TO SCREEN 0.
+  WHEN '&CANCEL'.
+    LEAVE TO SCREEN 0.
+  WHEN '&GERI'.
+    CALL SCREEN '0200'.
+  WHEN '&GLSTN1'.
+     PERFORM sil_material.
+  WHEN '&GLSTN2'.
+     PERFORM sil_personel.
+  WHEN '&GLSTN5'.
+     PERFORM sil_depo.
+ENDCASE.
+ENDMODULE.
+
+MODULE pbo_0200 OUTPUT.
+  PERFORM hide_admin_buttons_0200.
+
+ENDMODULE.
